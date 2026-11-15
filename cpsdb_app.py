@@ -2,10 +2,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import mysql.connector
 
-# ---- change these ----
+
 DB = dict(host="localhost", user="root", password="your_password", database="CPSDB")
 
-# ---- what the Browse tab can show ----
+
 VIEWS = {
     "Departments": "SELECT * FROM DEPARTMENT",
     "Students": "SELECT * FROM STUDENT",
@@ -33,7 +33,7 @@ VIEWS = {
 }
 
 
-# ---- database helpers (connect, execute, fetch, close) ----
+
 def query(sql):
     conn = mysql.connector.connect(**DB)
     cur = conn.cursor()
@@ -67,7 +67,7 @@ def run(name, args, ok_message):
         messagebox.showerror("Error", "Please check the values entered.")
 
 
-# ---- window ----
+
 root = tk.Tk()
 root.title("Campus Placement System")
 root.geometry("900x500")
@@ -90,7 +90,6 @@ def make_form(parent, fields, button_text, action):
     return frame
 
 
-# ---- Tab 1: browse ----
 browse = ttk.Frame(tabs, padding=5)
 tabs.add(browse, text="Browse")
 top = ttk.Frame(browse)
@@ -123,13 +122,11 @@ choice.bind("<<ComboboxSelected>>", refresh)
 scroll.pack(side="right", fill="y")
 tree.pack(fill="both", expand=True, pady=5)
 
-# ---- Tab 2: apply for a job ----
 tabs.add(make_form(tabs, ["Student ID", "Job ID"], "Apply",
          lambda v: run("sp_apply_for_job", (int(v[0]), int(v[1]), 0),
                        lambda r: f"Application created. ID = {r[2]}")),
          text="Apply")
 
-# ---- Tab 3: record a round result ----
 tabs.add(make_form(tabs, ["Application ID", "Round ID", "Score", "Status (Pass/Fail/Absent)", "Remarks"],
                    "Save result",
          lambda v: run("sp_record_result",
@@ -137,7 +134,6 @@ tabs.add(make_form(tabs, ["Application ID", "Round ID", "Score", "Status (Pass/F
                        lambda r: f"Result saved. ID = {r[5]}")),
          text="Record Result")
 
-# ---- Tab 4: offers ----
 tabs.add(make_form(tabs, ["Application ID", "CTC", "Joining date (YYYY-MM-DD)"], "Issue offer",
          lambda v: run("sp_issue_offer", (int(v[0]), float(v[1]), v[2], 0),
                        lambda r: f"Offer issued. ID = {r[3]}")),
@@ -148,7 +144,6 @@ tabs.add(make_form(tabs, ["Offer ID"], "Accept offer",
                        lambda r: "Offer accepted. Student's other pending offers were rejected.")),
          text="Accept Offer")
 
-# ---- Tab 5: withdraw ----
 tabs.add(make_form(tabs, ["Application ID"], "Withdraw",
          lambda v: run("sp_withdraw_application", (int(v[0]),),
                        lambda r: "Application withdrawn. Pending offers revoked.")),
