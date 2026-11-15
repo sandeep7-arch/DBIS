@@ -15,11 +15,7 @@ DROP PROCEDURE IF EXISTS sp_add_job;
 DROP PROCEDURE IF EXISTS sp_add_job_skill;
 DROP PROCEDURE IF EXISTS sp_add_round;
 
--- ==================================================================
--- Workflow procedures. Each one is a single transaction: it either
--- commits completely or rolls back and re-raises the original error
--- (including the messages signalled by the triggers).
--- ==================================================================
+
 
 DELIMITER //
 CREATE PROCEDURE sp_apply_for_job(IN p_student INT, IN p_job INT, OUT p_app INT)
@@ -83,7 +79,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A result is already recorded for this round';
     END IF;
 
-    -- triggers check the earlier rounds and update the application status
+
     INSERT INTO RESULT (Application_ID, Round_ID, Job_ID, Score, Result_Status, Remarks)
     VALUES (p_app, p_round, v_job, p_score, p_status, p_remarks);
     SET p_id = LAST_INSERT_ID();
@@ -114,7 +110,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Joining date cannot be in the past';
     END IF;
 
-    -- a NULL CTC is filled with the job CTC by the default_offer_values trigger
+
     INSERT INTO PLACEMENT_OFFER (Application_ID, Offered_CTC, Offer_Date, Expected_Joining_Date, Offer_Status)
     VALUES (p_app, p_ctc, CURDATE(), p_joining, 'Pending');
     SET p_offer = LAST_INSERT_ID();
@@ -136,9 +132,7 @@ BEGIN
 
     START TRANSACTION;
 
-    -- Locking reads only until the student row is locked: two simultaneous
-    -- accepts by the same student are forced to run one after the other, so
-    -- the one_accepted_offer trigger always sees the other one's result.
+
     SELECT a.Student_ID INTO v_student
     FROM PLACEMENT_OFFER o
     JOIN APPLICATION a ON a.Application_ID = o.Application_ID
@@ -197,9 +191,6 @@ BEGIN
 END//
 DELIMITER ;
 
--- ==================================================================
--- Master-data procedures (used by the "Manage Data" tab).
--- ==================================================================
 
 DELIMITER //
 CREATE PROCEDURE sp_add_department(
@@ -466,9 +457,6 @@ BEGIN
 END//
 DELIMITER ;
 
--- ==================================================================
--- Transaction demos (each one is rolled back, nothing is kept)
--- ==================================================================
 
 START TRANSACTION;
 
