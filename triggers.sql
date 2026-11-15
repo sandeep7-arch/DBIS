@@ -10,6 +10,7 @@ DROP TRIGGER IF EXISTS trg_result_ad;
 DROP TRIGGER IF EXISTS trg_offer_bi;
 DROP TRIGGER IF EXISTS trg_offer_bu;
 DROP PROCEDURE IF EXISTS sp_sync_application_status;
+DROP PROCEDURE IF EXISTS sp_record_oa_result;
 
 DROP TRIGGER IF EXISTS check_cgpa;
 DROP TRIGGER IF EXISTS check_backlogs;
@@ -227,5 +228,30 @@ BEGIN
                                          WHERE Application_ID = NEW.Application_ID)) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Student has already accepted another offer';
     END IF;
+END//
+
+DELIMITER ;
+
+-- Records a student's Online Assessment score; Is_Passed is derived from the
+-- company's Passing_Score. Re-recording a score overwrites the earlier one.
+DELIMITER //
+CREATE PROCEDURE sp_record_oa_result(
+    IN p_oa INT, IN p_student INT, IN p_score DECIMAL(5,2), OUT p_passed TINYINT)
+BEGIN
+    DECLARE v_pass DECIMAL(5,2);
+    SELECT Passing_Score INTO v_pass FROM ONLINE_ASSESSMENT WHERE OA_ID = p_oa;
+    IF v_pass IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Online assessment not found';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM STUDENT WHERE Student_ID = p_student) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Student not found';
+    END IF;
+    IF p_score < 0 OR p_score > 100 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Score must be between 0 and 100';
+    END IF;
+    SET p_passed = (p_score >= v_pass);
+    INSERT INTO OA_RESULT (OA_ID, Student_ID, Score, Is_Passed)
+    VALUES (p_oa, p_student, p_score, p_passed)
+    ON DUPLICATE KEY UPDATE Score = p_score, Is_Passed = p_passed;
 END//
 DELIMITER ;

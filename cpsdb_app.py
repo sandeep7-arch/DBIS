@@ -14,6 +14,11 @@ VIEWS = {
     "Companies": "SELECT * FROM COMPANY",
     "Job postings": "SELECT * FROM JOB_POSTING",
     "Online assessments": "SELECT * FROM ONLINE_ASSESSMENT",
+    "OA results": """SELECT r.OA_ID, o.OA_Name, r.Student_ID, s.Name AS Student,
+                            r.Score, o.Passing_Score, IF(r.Is_Passed, 'Pass', 'Fail') AS Outcome
+                     FROM OA_RESULT r
+                     JOIN ONLINE_ASSESSMENT o ON o.OA_ID = r.OA_ID
+                     JOIN STUDENT s ON s.Student_ID = r.Student_ID""",
     "Recruitment rounds": "SELECT * FROM RECRUITMENT_ROUND",
     "Applications": """SELECT a.Application_ID, s.Name AS Student, j.Job_Title, c.Company_Name,
                               a.Applied_Date, a.Current_Status
@@ -35,10 +40,10 @@ VIEWS = {
 
 
 
-def query(sql):
+def query(sql, params=None):
     conn = mysql.connector.connect(**DB)
     cur = conn.cursor()
-    cur.execute(sql)
+    cur.execute(sql, params or ())
     cols = [d[0] for d in cur.description]
     rows = cur.fetchall()
     cur.close()
@@ -91,37 +96,147 @@ def make_form(parent, fields, button_text, action):
     return frame
 
 
+PAGE = 100
+state = {"cols": [], "offset": 0, "total": 0, "sort": None, "desc": False,
+         "loading": False, "done": False}
+
 browse = ttk.Frame(tabs, padding=5)
 tabs.add(browse, text="Browse")
+
 top = ttk.Frame(browse)
-top.pack(fill="x")
-choice = ttk.Combobox(top, values=list(VIEWS), state="readonly", width=25)
-choice.current(7)
+top.pack(fill="x", pady=(0, 5))
+choice = ttk.Combobox(top, values=list(VIEWS), state="readonly", width=20)
+choice.set("Applications")
 choice.pack(side="left")
+ttk.Label(top, text="Search in").pack(side="left", padx=(15, 4))
+field = ttk.Combobox(top, values=["All columns"], state="readonly", width=18)
+field.current(0)
+field.pack(side="left")
+search_var = tk.StringVar()
+search_entry = ttk.Entry(top, textvariable=search_var, width=30)
+search_entry.pack(side="left", padx=6)
+
+status = ttk.Label(browse, anchor="w")
+status.pack(side="bottom", fill="x")
 tree = ttk.Treeview(browse, show="headings")
-scroll = ttk.Scrollbar(browse, command=tree.yview)
-tree.configure(yscrollcommand=scroll.set)
+vbar = ttk.Scrollbar(browse, command=tree.yview)
+hbar = ttk.Scrollbar(browse, orient="horizontal", command=tree.xview)
+tree.tag_configure("odd", background="#f2f5f9")
 
 
-def refresh(*_):
+def _where():
+    text = search_var.get().strip()
+    if not text:
+        return "", []
+    if field.get() == "All columns":
+        expr = "CONCAT_WS(' ', " + ", ".join(f"`{c}`" for c in state["cols"]) + ")"
+    else:
+        expr = f"`{field.get()}`"
+    return f" WHERE {expr} LIKE %s", [f"%{text}%"]
+
+
+def _update_status():
+    shown = len(tree.get_children())
+    status.config(text=f"Showing {shown:,} of {state['total']:,} rows"
+                       + ("" if state["done"] else "  (scroll down for more)"))
+
+
+def load_more():
+    if state["loading"] or state["done"]:
+        return
+    state["loading"] = True
     try:
-        cols, rows = query(VIEWS[choice.get()])
+        where, params = _where()
+        order = (f" ORDER BY `{state['sort']}` {'DESC' if state['desc'] else 'ASC'}"
+                 if state["sort"] else " ORDER BY 1")
+        _, rows = query(f"SELECT * FROM ({VIEWS[choice.get()]}) AS v{where}{order} "
+                        f"LIMIT %s OFFSET %s", params + [PAGE, state["offset"]])
+    except mysql.connector.Error as e:
+        messagebox.showerror("Error", e.msg)
+        return
+    finally:
+        state["loading"] = False
+    for r in rows:
+        tree.insert("", "end", values=r,
+                    tags=("odd",) if len(tree.get_children()) % 2 else ())
+    state["offset"] += len(rows)
+    state["done"] = len(rows) < PAGE
+    _update_status()
+
+
+def reload(new_view=False):
+    try:
+        if new_view:
+            cols, _ = query(f"SELECT * FROM ({VIEWS[choice.get()]}) AS v LIMIT 0")
+            state.update(cols=cols, sort=None, desc=False)
+            field["values"] = ["All columns"] + cols
+            field.current(0)
+            search_var.set("")
+        where, params = _where()
+        state["total"] = query(f"SELECT COUNT(*) FROM ({VIEWS[choice.get()]}) AS v{where}",
+                               params)[1][0][0]
     except mysql.connector.Error as e:
         messagebox.showerror("Error", e.msg)
         return
     tree.delete(*tree.get_children())
-    tree["columns"] = cols
-    for c in cols:
-        tree.heading(c, text=c)
-        tree.column(c, width=110)
-    for r in rows:
-        tree.insert("", "end", values=r)
+    tree["columns"] = state["cols"]
+    for c in state["cols"]:
+        arrow = ""
+        if state["sort"] == c:
+            arrow = " ▼" if state["desc"] else " ▲"
+        tree.heading(c, text=c + arrow, command=lambda c=c: sort_by(c))
+        tree.column(c, width=120, stretch=False)
+    state.update(offset=0, done=False)
+    load_more()
 
 
+def refresh(*_):
+    reload(new_view=not state["cols"])
+
+
+def sort_by(col):
+    state["desc"] = state["sort"] == col and not state["desc"]
+    state["sort"] = col
+    reload()
+
+
+def check_bottom(*_):
+    if tree.yview()[1] >= 0.98:
+        load_more()
+
+
+_after = {"id": None}
+def on_type(_e):                       # debounce: search 300 ms after typing stops
+    if _after["id"]:
+        root.after_cancel(_after["id"])
+    _after["id"] = root.after(300, reload)
+
+
+def clear_search():
+    search_var.set("")
+    reload()
+
+
+ttk.Button(top, text="Clear", command=clear_search).pack(side="left")
 ttk.Button(top, text="Refresh", command=refresh).pack(side="left", padx=8)
-choice.bind("<<ComboboxSelected>>", refresh)
-scroll.pack(side="right", fill="y")
-tree.pack(fill="both", expand=True, pady=5)
+
+search_entry.bind("<KeyRelease>", on_type)
+field.bind("<<ComboboxSelected>>", lambda e: reload())
+choice.bind("<<ComboboxSelected>>", lambda e: reload(new_view=True))
+tree.configure(yscrollcommand=lambda a, b: (vbar.set(a, b), check_bottom()),
+               xscrollcommand=hbar.set)
+for ev in ("<MouseWheel>", "<Button-4>", "<Button-5>", "<KeyRelease-Down>"):
+    tree.bind(ev, lambda e: tree.after(50, check_bottom), add="+")
+
+vbar.pack(side="right", fill="y")
+hbar.pack(side="bottom", fill="x")
+tree.pack(fill="both", expand=True)
+
+tabs.add(make_form(tabs, ["OA ID", "Student ID", "Score"], "Save OA result",
+         lambda v: run("sp_record_oa_result", (int(v[0]), int(v[1]), float(v[2]), 0),
+                       lambda r: "OA result saved. Student PASSED, can now apply."
+                                 if r[3] else "OA result saved. Student did NOT pass.")),
+         text="Record OA Result")
 
 tabs.add(make_form(tabs, ["Student ID", "Job ID"], "Apply",
          lambda v: run("sp_apply_for_job", (int(v[0]), int(v[1]), 0),
