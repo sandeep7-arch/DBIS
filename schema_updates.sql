@@ -33,10 +33,7 @@ ALTER TABLE PLACEMENT_OFFER
     ADD CONSTRAINT chk_offer_dates  CHECK (Expected_Joining_Date IS NULL OR Offer_Date IS NULL
                                            OR Expected_Joining_Date >= Offer_Date);
 
--- ------------------------------------------------------------------
--- Auto-generated IDs: the app and procedures no longer pick IDs by hand.
--- Existing rows keep their IDs; new rows continue after the current maximum.
--- ------------------------------------------------------------------
+
 SET FOREIGN_KEY_CHECKS = 0;
 
 ALTER TABLE DEPARTMENT        MODIFY Dept_ID        INTEGER NOT NULL AUTO_INCREMENT;
