@@ -32,3 +32,22 @@ ALTER TABLE PLACEMENT_OFFER
     ADD CONSTRAINT chk_offer_ctc    CHECK (Offered_CTC > 0),
     ADD CONSTRAINT chk_offer_dates  CHECK (Expected_Joining_Date IS NULL OR Offer_Date IS NULL
                                            OR Expected_Joining_Date >= Offer_Date);
+
+-- ------------------------------------------------------------------
+-- Auto-generated IDs: the app and procedures no longer pick IDs by hand.
+-- Existing rows keep their IDs; new rows continue after the current maximum.
+-- ------------------------------------------------------------------
+SET FOREIGN_KEY_CHECKS = 0;
+
+ALTER TABLE DEPARTMENT        MODIFY Dept_ID        INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE STUDENT           MODIFY Student_ID     INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE SKILL             MODIFY Skill_ID       INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE COMPANY           MODIFY Company_ID     INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE JOB_POSTING       MODIFY Job_ID         INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE ONLINE_ASSESSMENT MODIFY OA_ID          INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE APPLICATION       MODIFY Application_ID INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE RECRUITMENT_ROUND MODIFY Round_ID       INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE RESULT            MODIFY Result_ID      INTEGER NOT NULL AUTO_INCREMENT;
+ALTER TABLE PLACEMENT_OFFER   MODIFY Offer_ID       INTEGER NOT NULL AUTO_INCREMENT;
+
+SET FOREIGN_KEY_CHECKS = 1;
