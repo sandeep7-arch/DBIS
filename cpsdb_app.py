@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import mysql.connector
 
 
-DB = dict(host="localhost", user="root", password="your_password", database="CPSDB")
+DB = dict(host="localhost", user="cpsapp", password="cps123", database="CPSDB")
 
 
 VIEWS = {
